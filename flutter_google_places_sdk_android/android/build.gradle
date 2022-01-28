@@ -54,7 +54,10 @@ android {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-    implementation "com.google.android.libraries.places:places:$google_places_version"
+    implementation("com.google.android.libraries.places:places:$google_places_version") {
+        exclude group: 'com.android.volley'
+    }
+    implementation 'com.android.volley:volley:1.2.0'
 
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.mockito:mockito-core:5.1.1'
