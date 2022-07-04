@@ -29,7 +29,9 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
             let args = call.arguments as? Dictionary<String,Any>
             let apiKey = args?["apiKey"] as! String?
             // we can't do anything with the locale so no need to read it
-            initialize(apiKey: apiKey)
+            let locale = args?["locale"] as? Dictionary<String,Any>
+            
+            initialize(apiKey: apiKey, locale: locale)
             result(nil)
         case METHOD_DEINITIALIZE:
             // nothing to do
@@ -354,8 +356,17 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
         return CLLocation(latitude: lat, longitude: lng)
     }
     
-    private func initialize(apiKey: String?) {
+    private func initialize(apiKey: String?, locale: Dictionary<String,Any>?) {
+        defineLocale(locale: locale)
         GMSPlacesClient.provideAPIKey(apiKey ?? "")
         placesClient = GMSPlacesClient.shared()
+    }
+
+    private func defineLocale(locale: Dictionary<String,Any>?) {
+        if let locale = locale,
+           let language = locale["language"],
+           let country = locale["country"] {
+            UserDefaults.standard.set(["\(language)-\(country)"], forKey: "AppleLanguages")
+        }
     }
 }
