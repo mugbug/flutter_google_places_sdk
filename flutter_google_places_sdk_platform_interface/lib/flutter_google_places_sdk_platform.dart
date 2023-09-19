@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_google_places_sdk_platform_interface/flutter_google_places_sdk_platform_interface.dart';
 import 'package:flutter_google_places_sdk_platform_interface/method_channel_flutter_google_places_sdk.dart';
-import 'package:flutter_google_places_sdk_platform_interface/src/types/fetch_place_response.dart';
-import 'package:flutter_google_places_sdk_platform_interface/src/types/find_autocomplete_predictions_response.dart';
-import 'package:flutter_google_places_sdk_platform_interface/src/types/place_field.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 /// A [PlatformInterface] for flutter google places sdk
@@ -58,6 +55,11 @@ abstract class FlutterGooglePlacesSdkPlatform extends PlatformInterface {
     throw UnimplementedError('isInitialized() has not been implemented.');
   }
 
+  /// Updates the settings of the places client with the given API key and locale.
+  Future<void> updateSettings(String apiKey, {Locale? locale}) {
+    throw UnimplementedError('initialize() has not been implemented.');
+  }
+
   /// Fetches autocomplete predictions based on a query.
   ///
   /// If [countries]] is not null, the results are restricted to those countries.
@@ -77,9 +79,11 @@ abstract class FlutterGooglePlacesSdkPlatform extends PlatformInterface {
   Future<FindAutocompletePredictionsResponse> findAutocompletePredictions(
     String query, {
     List<String>? countries,
-    PlaceTypeFilter placeTypeFilter = PlaceTypeFilter.ALL,
+    List<PlaceTypeFilter> placeTypesFilter = const [],
     bool? newSessionToken,
     LatLng? origin,
+    LatLngBounds? locationBias,
+    LatLngBounds? locationRestriction,
   }) {
     throw UnimplementedError(
         'findAutocompletePredictions() has not been implemented.');
@@ -94,9 +98,23 @@ abstract class FlutterGooglePlacesSdkPlatform extends PlatformInterface {
   /// For more info about billing: https://developers.google.com/maps/documentation/places/web-service/usage-and-billing
   Future<FetchPlaceResponse> fetchPlace(
     String placeId, {
-    List<PlaceField>? fields,
+    required List<PlaceField> fields,
     bool? newSessionToken,
   }) {
     throw UnimplementedError('fetchPlaceDetails() has not been implemented.');
+  }
+
+  /// Fetches a photo of a place.
+  ///
+  /// Before fetching a place photo the place it self must be fetched,
+  /// together with the [PlaceField.PhotoMetadatas] field
+  ///
+  /// For more info: https://developers.google.com/maps/documentation/places/android-sdk/photos
+  Future<FetchPlacePhotoResponse> fetchPlacePhoto(
+    PhotoMetadata photoMetadata, {
+    int? maxWidth,
+    int? maxHeight,
+  }) {
+    throw UnimplementedError('fetchPlacePhoto() has not been implemented.');
   }
 }

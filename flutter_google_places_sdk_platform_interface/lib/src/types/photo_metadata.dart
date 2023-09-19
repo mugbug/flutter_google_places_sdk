@@ -1,41 +1,28 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'photo_metadata.freezed.dart';
+part 'photo_metadata.g.dart';
+
 /// The metadata corresponding to a single photo associated with a place.
 ///
 /// Ref: https://developers.google.com/maps/documentation/places/android-sdk/reference/com/google/android/libraries/places/api/model/PhotoMetadata
-class PhotoMetadata {
-  const PhotoMetadata({
-    required this.attributions,
-    required this.width,
-    required this.height,
-  });
+@freezed
+class PhotoMetadata with _$PhotoMetadata {
+  const factory PhotoMetadata({
+    /// Non-empty String used to identify the underlying photo.
+    required String photoReference,
 
-  final String attributions;
-  final int width;
-  final int height;
+    /// The maximum width in which this photo is available.
+    required int width,
 
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is PhotoMetadata &&
-          runtimeType == other.runtimeType &&
-          attributions == other.attributions &&
-          width == other.width &&
-          height == other.height;
+    /// The maximum height in which this photo is available.
+    required int height,
 
-  @override
-  int get hashCode => attributions.hashCode ^ width.hashCode ^ height.hashCode;
+    /// The attributions that must be shown to the user if this photo is displayed.
+    required String attributions,
+  }) = _PhotoMetadata;
 
-  @override
-  String toString() =>
-      'PhotoMetadata{attributions: $attributions, width: $width, height: $height}';
-
-  Map<String, dynamic> toMap() =>
-      {'attributions': attributions, 'width': width, 'height': height};
-
-  static PhotoMetadata? fromMap(Map<String, dynamic>? map) => map == null
-      ? null
-      : PhotoMetadata(
-          attributions: map['attributions'],
-          width: map['width'],
-          height: map['height'],
-        );
+  /// Parse an [PhotoMetadata] from json.
+  factory PhotoMetadata.fromJson(Map<String, Object?> json) =>
+      _$PhotoMetadataFromJson(json);
 }

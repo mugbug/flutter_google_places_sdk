@@ -9,10 +9,13 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
     let METHOD_IS_INITIALIZE = "isInitialized"
     let METHOD_FIND_AUTOCOMPLETE_PREDICTIONS = "findAutocompletePredictions"
     let METHOD_FETCH_PLACE = "fetchPlace"
+    let METHOD_FETCH_PLACE_PHOTO = "fetchPlacePhoto"
     
     private var placesClient: GMSPlacesClient!
     private var lastSessionToken: GMSAutocompleteSessionToken?
-
+    
+    private var photosCache: Dictionary<String, GMSPlacePhotoMetadata> = [:]
+    private var runningUid: Int = 1
 
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: CHANNEL_NAME, binaryMessenger: registrar.messenger())
@@ -34,12 +37,14 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
         case METHOD_IS_INITIALIZE:
             result(placesClient != nil)
         case METHOD_FIND_AUTOCOMPLETE_PREDICTIONS:
-            let args = call.arguments as? Dictionary<String,Any>
-            let query = args?["query"] as! String
-            let countries = args?["countries"] as! [String]? ?? [String]()
-            let placeTypeFilter = args?["typeFilter"] as! String?
-            let origin = latLngFromMap(argument: args?["origin"] as? Dictionary<String, Any?>)
-            let newSessionToken = args?["newSessionToken"] as! Bool
+            let args = call.arguments as! Dictionary<String,Any>
+            let query = args["query"] as! String
+            let countries = args["countries"] as? [String]? ?? [String]()
+            let placeTypeFilter = args["typeFilter"] as? String
+            let origin = latLngFromMap(argument: args["origin"] as? Dictionary<String, Any?>)
+            let newSessionToken = args["newSessionToken"] as? Bool
+            let locationBias = rectangularBoundsFromMap(argument: args["locationBias"] as? Dictionary<String, Any?>)
+            let locationRestriction = rectangularBoundsFromMap(argument: args["locationRestriction"] as? Dictionary<String, Any?>)
             let sessionToken = getSessionToken(force: newSessionToken == true)
             
             // Create a type filter.
@@ -47,6 +52,8 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
             filter.type = makeTypeFilter(typeFilter: placeTypeFilter);
             filter.countries = countries
             filter.origin = origin
+            filter.locationBias = locationBias
+            filter.locationRestriction = locationRestriction
 
             placesClient.findAutocompletePredictions(
                 fromQuery: query, filter: filter, sessionToken: sessionToken,
@@ -65,14 +72,14 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
                     }
                 })
         case METHOD_FETCH_PLACE:
-            let args = call.arguments as? Dictionary<String,Any>
-            let placeId = args?["placeId"] as! String
-            let fields = ((args?["fields"] as! [String]?)?.map {
+            let args = call.arguments as! Dictionary<String,Any>
+            let placeId = args["placeId"] as! String
+            let fields = ((args["fields"] as? [String])?.map {
                 (item) in return placeFieldFromStr(it: item)
             })?.reduce(GMSPlaceField(), { partialResult, field in
                 return GMSPlaceField(rawValue: partialResult.rawValue | field.rawValue)
             })
-            let newSessionToken = args?["newSessionToken"] as? Bool ?? false
+            let newSessionToken = args["newSessionToken"] as? Bool ?? false
             let sessionToken = getSessionToken(force: newSessionToken == true)
             
             placesClient.fetchPlace(fromPlaceID: placeId,
@@ -89,6 +96,32 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
                     let mappedPlace = self.placeToMap(place: place)
                     result(mappedPlace)
                 }
+            }
+        case METHOD_FETCH_PLACE_PHOTO:
+            let args = call.arguments as! Dictionary<String,Any>
+            let photoMetadataMap = args["photoMetadata"] as! Dictionary<String,Any>
+            let photoRef = photoMetadataMap["photoReference"] as! String
+            
+            if let photoMetadata = photosCache[photoRef] {
+                placesClient.loadPlacePhoto(photoMetadata, callback: { (photo, error) -> Void in
+                    if let error = error {
+                        print("fetchPlacePhoto error: \(error)")
+                        result(FlutterError(
+                            code: "API_ERROR_PHOTO",
+                            message: error.localizedDescription,
+                            details: nil
+                        ))
+                    } else {
+                        let data = photo?.pngData()
+                        result(data)
+                    }
+                })
+            } else {
+                result(FlutterError(
+                    code: "API_ERROR_PHOTO",
+                    message: "PhotoMetadata must be initially fetched with fetchPlace",
+                    details: ""
+                ))
             }
         default:
             result(FlutterMethodNotImplemented)
@@ -137,7 +170,7 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
             "types": place.types?.map { (it) in return it.uppercased() },
             "userRatingsTotal": place.userRatingsTotal,
             "utcOffsetMinutes": place.utcOffsetMinutes,
-            // "viewport": latLngBoundsToMap(viewport: place.viewportInfo),
+            "viewport": latLngBoundsToMap(viewport: place.viewportInfo),
             "websiteUri": place.website?.absoluteString
         ]
     }
@@ -167,11 +200,22 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
     }
     
     private func photoMetadataToMap(photoMetadata: GMSPlacePhotoMetadata) -> Dictionary<String, Any?> {
+        let photoRef = _getPhotoReference()
+        
+        photosCache[photoRef] = photoMetadata
+        
         return [
+            "photoReference": photoRef,
             "width": Int(photoMetadata.maxSize.width),
             "height": Int(photoMetadata.maxSize.height),
             "attributions": photoMetadata.attributions?.string
         ]
+    }
+    
+    private func _getPhotoReference() -> String {
+        let num = runningUid
+        runningUid += 1
+        return "id_" + String(num);
     }
     
     private func openingHoursToMap(openingHours: GMSOpeningHours?) -> Dictionary<String, Any?>? {
@@ -230,7 +274,17 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
             "lng": coordinate.longitude
         ]
     }
-    
+
+    private func latLngBoundsToMap(viewport: GMSPlaceViewportInfo?) -> Dictionary<String, Any?>? {
+        guard let viewport = viewport else {
+            return nil
+        }
+        return [
+            "southwest": latLngToMap(coordinate: viewport.southWest),
+            "northeast": latLngToMap(coordinate: viewport.northEast)
+        ]
+    }
+
     private func addressComponentToMap(addressComponent: GMSAddressComponent) -> Dictionary<String, Any?> {
       return [
         "name": addressComponent.name,
@@ -290,8 +344,19 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
         return localToken
     }
     
+    private func rectangularBoundsFromMap(argument: Dictionary<String, Any?>?) -> (GMSPlaceLocationBias & GMSPlaceLocationRestriction)? {
+        guard let argument = argument,
+              let southWest = latLngFromMap(argument: argument["southwest"] as? Dictionary<String, Any?>)?.coordinate as? CLLocationCoordinate2D,
+              let northEast = latLngFromMap(argument: argument["northeast"] as? Dictionary<String, Any?>)?.coordinate as? CLLocationCoordinate2D
+               else {
+            return nil
+        }
+        
+        return GMSPlaceRectangularLocationOption(northEast, southWest);
+    }
     
-    private func latLngFromMap(argument: Dictionary<String, Any?>?) -> CLLocation? {        
+    
+    private func latLngFromMap(argument: Dictionary<String, Any?>?) -> CLLocation? {
         guard let argument = argument,
               let lat = argument["lat"] as? Double,
               let lng = argument["lng"] as? Double else {
