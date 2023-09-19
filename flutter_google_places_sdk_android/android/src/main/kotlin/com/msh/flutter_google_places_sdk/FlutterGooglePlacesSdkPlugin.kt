@@ -28,7 +28,7 @@ class FlutterGooglePlacesSdkPlugin : FlutterPlugin, MethodCallHandler {
 
     private var lastSessionToken: AutocompleteSessionToken? = null
 
-    override fun onAttachedToEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
+    override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         onAttachedToEngine(binding.applicationContext, binding.binaryMessenger)
     }
 
@@ -39,13 +39,20 @@ class FlutterGooglePlacesSdkPlugin : FlutterPlugin, MethodCallHandler {
         channel.setMethodCallHandler(this)
     }
 
-    override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
+    override fun onMethodCall(call: MethodCall, result: Result) {
         when (call.method) {
             METHOD_INITIALIZE -> {
                 val apiKey = call.argument<String>("apiKey")
                 val localeMap = call.argument<Map<String, Any>>("locale")
                 val locale = readLocale(localeMap)
                 initialize(apiKey, locale)
+                result.success(null)
+            }
+            METHOD_UPDATE_SETTINGS -> {
+                val apiKey = call.argument<String>("apiKey")
+                val localeMap = call.argument<Map<String, Any>>("locale")
+                val locale = readLocale(localeMap)
+                updateSettings(apiKey, locale)
                 result.success(null)
             }
             METHOD_DEINITIALIZE -> {
@@ -58,7 +65,7 @@ class FlutterGooglePlacesSdkPlugin : FlutterPlugin, MethodCallHandler {
             METHOD_FIND_AUTOCOMPLETE_PREDICTIONS -> {
                 val query = call.argument<String>("query")
                 val countries = call.argument<List<String>>("countries") ?: emptyList()
-                val placeTypeFilter = call.argument<String>("typeFilter")
+                val placeTypesFilter = call.argument<List<String>>("typesFilter")?.map { it.lowercase() } ?: emptyList()
                 val newSessionToken = call.argument<Boolean>("newSessionToken")
 
                 val origin = latLngFromMap(call.argument<Map<String, Any?>>("origin"))
@@ -67,13 +74,12 @@ class FlutterGooglePlacesSdkPlugin : FlutterPlugin, MethodCallHandler {
                 val locationRestriction =
                     rectangularBoundsFromMap(call.argument<Map<String, Any?>>("locationRestriction"))
                 val sessionToken = getSessionToken(newSessionToken == true)
-                val typeFilter = makeTypeFilter(placeTypeFilter)
                 val request = FindAutocompletePredictionsRequest.builder()
                     .setQuery(query)
                     .setLocationBias(locationBias)
                     .setLocationRestriction(locationRestriction)
                     .setCountries(countries)
-                    .setTypeFilter(typeFilter)
+                    .setTypesFilter(placeTypesFilter)
                     .setSessionToken(sessionToken)
                     .setOrigin(origin)
                     .build()
@@ -177,15 +183,6 @@ class FlutterGooglePlacesSdkPlugin : FlutterPlugin, MethodCallHandler {
 
         return LatLngBounds(southWest, northEast)
     }
-
-    private fun makeTypeFilter(typeFilterStr: String?): TypeFilter? {
-        val typeFilterStrUpper = typeFilterStr?.toUpperCase(Locale.getDefault())
-        if (typeFilterStrUpper == null || typeFilterStrUpper == "ALL") {
-            return null
-        }
-        return TypeFilter.valueOf(typeFilterStrUpper)
-    }
-
 
     private fun getSessionToken(force: Boolean): AutocompleteSessionToken {
         val localToken = lastSessionToken
@@ -331,7 +328,7 @@ class FlutterGooglePlacesSdkPlugin : FlutterPlugin, MethodCallHandler {
             for (field in javaCls.declaredFields) {
                 yield(field)
             }
-            javaCls = javaCls.superclass;
+            javaCls = javaCls.superclass
         }
     }
 
@@ -402,22 +399,30 @@ class FlutterGooglePlacesSdkPlugin : FlutterPlugin, MethodCallHandler {
             return null
         }
 
-        val language = localeMap["language"] as String
-        val country = localeMap["country"] as String
+        val language = localeMap["language"] as? String ?: return null
+        var country = localeMap["country"] as? String
+        if (country == null) {
+            country = Locale.getDefault().country
+        }
         return Locale(language, country)
     }
 
     private fun initialize(apiKey: String?, locale: Locale?) {
-        Places.initialize(applicationContext, apiKey ?: "", locale)
+        updateSettings(apiKey, locale)
         client = Places.createClient(applicationContext)
     }
 
-    override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
+    private fun updateSettings(apiKey: String?, locale: Locale?) {
+        Places.initialize(applicationContext, apiKey ?: "", locale)
+    }
+
+    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
     }
 
     companion object {
         private const val METHOD_INITIALIZE = "initialize"
+        private const val METHOD_UPDATE_SETTINGS = "updateSettings"
         private const val METHOD_DEINITIALIZE = "deinitialize"
         private const val METHOD_IS_INITIALIZE = "isInitialized"
         private const val METHOD_FIND_AUTOCOMPLETE_PREDICTIONS = "findAutocompletePredictions"

@@ -1,17 +1,16 @@
 import 'package:collection/collection.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_google_places_sdk/flutter_google_places_sdk.dart';
+import 'package:flutter_google_places_sdk_example/constants.dart';
 import 'package:flutter_google_places_sdk_example/google_places_img.dart'
     if (dart.library.html) 'package:flutter_google_places_sdk_example/google_places_img_web.dart'
     as gpi;
+import 'package:flutter_google_places_sdk_example/settings_page.dart';
 
 /// Title
 const title = 'Flutter Google Places SDK Example';
-
-/// note: do NOT store your api key in here or in the code at all.
-/// use an external source such as file or firebase remote config
-const API_KEY = '';
 
 void main() {
   runApp(MyApp());
@@ -43,7 +42,7 @@ class _MyHomePageState extends State<MyHomePage> {
   //
   String? _predictLastText;
 
-  PlaceTypeFilter _placeTypeFilter = PlaceTypeFilter.ESTABLISHMENT;
+  List<PlaceTypeFilter> _placeTypesFilter = [PlaceTypeFilter.ESTABLISHMENT];
 
   bool _locationBiasEnabled = true;
   LatLngBounds _locationBias = LatLngBounds(
@@ -99,7 +98,10 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
 
-    _places = FlutterGooglePlacesSdk(API_KEY);
+    _places = FlutterGooglePlacesSdk(INITIAL_API_KEY, locale: INITIAL_LOCALE);
+    _places.isInitialized().then((value) {
+      debugPrint('Places Initialized: $value');
+    });
   }
 
   @override
@@ -108,7 +110,13 @@ class _MyHomePageState extends State<MyHomePage> {
     final fetchPlaceWidgets = _buildFetchPlaceWidgets();
     final fetchPlacePhotoWidgets = _buildFetchPlacePhotoWidgets();
     return Scaffold(
-      appBar: AppBar(title: const Text(title)),
+      appBar: AppBar(
+        title: const Text(title),
+        actions: [
+          new IconButton(
+              onPressed: _openSettingsModal, icon: const Icon(Icons.settings)),
+        ],
+      ),
       body: Padding(
         padding: EdgeInsets.all(30),
         child: ListView(
@@ -129,7 +137,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void _onPlaceTypeFilterChanged(PlaceTypeFilter? value) {
     if (value != null) {
       setState(() {
-        _placeTypeFilter = value;
+        _placeTypesFilter = [value];
       });
     }
   }
@@ -218,7 +226,7 @@ class _MyHomePageState extends State<MyHomePage> {
       final result = await _places.findAutocompletePredictions(
         _predictLastText!,
         countries: _countriesEnabled ? _countries : null,
-        placeTypeFilter: _placeTypeFilter,
+        placeTypesFilter: _placeTypesFilter,
         newSessionToken: false,
         origin: LatLng(lat: 43.12, lng: 95.20),
         locationBias: _locationBiasEnabled ? _locationBias : null,
@@ -257,7 +265,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final theme = Theme.of(context);
     final errorText = err == null ? '' : err.toString();
     return Text(errorText,
-        style: theme.textTheme.caption?.copyWith(color: theme.errorColor));
+        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error));
   }
 
   List<Widget> _buildFetchPlacePhotoWidgets() {
@@ -325,7 +333,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
       // -- Error widget + Result
       _buildErrorWidget(_fetchingPlaceErr),
-      Text('Result: ' + (_place?.toString() ?? 'N/A')),
+      WebSelectableText('Result: ' + (_place?.toString() ?? 'N/A')),
     ];
   }
 
@@ -352,6 +360,7 @@ class _MyHomePageState extends State<MyHomePage> {
         onChanged: _onPredictTextChanged,
         decoration: InputDecoration(label: Text("Query")),
       ),
+      // -- Countries
       _buildEnabledOption(
         _countriesEnabled,
         (value) => _countriesEnabled = value,
@@ -364,14 +373,16 @@ class _MyHomePageState extends State<MyHomePage> {
           initialValue: _countries.join(","),
         ),
       ),
+      // -- Place Types
       DropdownButton<PlaceTypeFilter>(
         items: PlaceTypeFilter.values
             .map((item) => DropdownMenuItem<PlaceTypeFilter>(
                 child: Text(item.value), value: item))
             .toList(growable: false),
-        value: _placeTypeFilter,
+        value: _placeTypesFilter.isEmpty ? null : _placeTypesFilter[0],
         onChanged: _onPlaceTypeFilterChanged,
       ),
+      // -- Location Bias
       _buildEnabledOption(
         _locationBiasEnabled,
         (value) => _locationBiasEnabled = value,
@@ -386,6 +397,7 @@ class _MyHomePageState extends State<MyHomePage> {
           },
         ),
       ),
+      // -- Location Restrictions
       _buildEnabledOption(
         _locationRestrictionEnabled,
         (value) => _locationRestrictionEnabled = value,
@@ -400,6 +412,7 @@ class _MyHomePageState extends State<MyHomePage> {
           },
         ),
       ),
+      // -- Predict
       ElevatedButton(
         onPressed: _predicting == true ? null : _predict,
         child: const Text('Predict'),
@@ -426,6 +439,11 @@ class _MyHomePageState extends State<MyHomePage> {
 
     return gpi.GooglePlacesImg(
         photoMetadata: _placePhotoMetadata!, placePhotoResponse: placePhoto);
+  }
+
+  void _openSettingsModal() {
+    Navigator.push(
+        context, MaterialPageRoute(builder: (context) => SettingsPage(_places)));
   }
 }
 
@@ -509,7 +527,7 @@ class _LocationFieldState extends State<LocationField> {
         keyboardType:
             TextInputType.numberWithOptions(signed: true, decimal: true),
         inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'[0-9\.]')),
+          FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
         ],
         onChanged: (value) => _onValueChanged(controller, value),
         decoration: InputDecoration(label: Text(label)),
@@ -528,5 +546,30 @@ class _LocationFieldState extends State<LocationField> {
         northeast: LatLng(lat: neLat, lng: 0.0));
 
     widget.onChanged(bounds);
+  }
+}
+
+/// Creates a web-selectable text widget.
+///
+/// If the platform is web, the widget created is [SelectableText].
+/// Otherwise, it's a [Text].
+class WebSelectableText extends StatelessWidget {
+  /// The text to display.
+  ///
+  /// This will be null if a [textSpan] is provided instead.
+  final String data;
+
+  /// Creates a web-selectable text widget.
+  ///
+  /// If the platform is web, the widget created is [SelectableText].
+  /// Otherwise, it's a [Text].
+  const WebSelectableText(this.data, {Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return SelectableText(data);
+    }
+    return Text(data);
   }
 }

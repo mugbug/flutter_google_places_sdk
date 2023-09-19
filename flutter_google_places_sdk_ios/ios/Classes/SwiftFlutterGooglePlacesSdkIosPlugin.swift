@@ -45,6 +45,8 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
             let placeTypeFilter = args["typeFilter"] as? String
             let origin = latLngFromMap(argument: args["origin"] as? Dictionary<String, Any?>)
             let newSessionToken = args["newSessionToken"] as? Bool
+            let locationBias = rectangularBoundsFromMap(argument: args["locationBias"] as? Dictionary<String, Any?>)
+            let locationRestriction = rectangularBoundsFromMap(argument: args["locationRestriction"] as? Dictionary<String, Any?>)
             let sessionToken = getSessionToken(force: newSessionToken == true)
             
             // Create a type filter.
@@ -52,6 +54,8 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
             filter.type = makeTypeFilter(typeFilter: placeTypeFilter);
             filter.countries = countries
             filter.origin = origin
+            filter.locationBias = locationBias
+            filter.locationRestriction = locationRestriction
 
             placesClient.findAutocompletePredictions(
                 fromQuery: query, filter: filter, sessionToken: sessionToken,
@@ -168,7 +172,7 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
             "types": place.types?.map { (it) in return it.uppercased() },
             "userRatingsTotal": place.userRatingsTotal,
             "utcOffsetMinutes": place.utcOffsetMinutes,
-            "viewport": latLngBoundsToMap(viewport: place.viewportInfo!),
+            "viewport": latLngBoundsToMap(viewport: place.viewportInfo),
             "websiteUri": place.website?.absoluteString
         ]
     }
@@ -285,7 +289,17 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
             "lng": coordinate.longitude
         ]
     }
-    
+
+    private func latLngBoundsToMap(viewport: GMSPlaceViewportInfo?) -> Dictionary<String, Any?>? {
+        guard let viewport = viewport else {
+            return nil
+        }
+        return [
+            "southwest": latLngToMap(coordinate: viewport.southWest),
+            "northeast": latLngToMap(coordinate: viewport.northEast)
+        ]
+    }
+
     private func addressComponentToMap(addressComponent: GMSAddressComponent) -> Dictionary<String, Any?> {
       return [
         "name": addressComponent.name,
@@ -345,8 +359,19 @@ public class SwiftFlutterGooglePlacesSdkIosPlugin: NSObject, FlutterPlugin {
         return localToken
     }
     
+    private func rectangularBoundsFromMap(argument: Dictionary<String, Any?>?) -> (GMSPlaceLocationBias & GMSPlaceLocationRestriction)? {
+        guard let argument = argument,
+              let southWest = latLngFromMap(argument: argument["southwest"] as? Dictionary<String, Any?>)?.coordinate as? CLLocationCoordinate2D,
+              let northEast = latLngFromMap(argument: argument["northeast"] as? Dictionary<String, Any?>)?.coordinate as? CLLocationCoordinate2D
+               else {
+            return nil
+        }
+        
+        return GMSPlaceRectangularLocationOption(northEast, southWest);
+    }
     
-    private func latLngFromMap(argument: Dictionary<String, Any?>?) -> CLLocation? {        
+    
+    private func latLngFromMap(argument: Dictionary<String, Any?>?) -> CLLocation? {
         guard let argument = argument,
               let lat = argument["lat"] as? Double,
               let lng = argument["lng"] as? Double else {

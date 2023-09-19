@@ -1,3 +1,28 @@
+## 0.2.6
+
+* Added any_map to all enums to freezed -> json_serializable
+* Defined custom fromJson and toJson for all enums for case insensitive serialization & deserialization.
+* Upgraded sdk minimum to 2.17.0 for enhanced enum support
+
+## 0.2.5
+
+* findAutocompletePredictions: now uses List<String> for typeFilter rather than just a single String.
+* PlaceTypeFilter: Removed ALL enum. Since it's used as a list, passing an empty list is equivalent to all.
+* Updated sdk minimum to 2.14.0
+
+## 0.2.4+4
+
+* Added types property to the Autocomplete predictions
+
+## 0.2.4+3
+
+* Introducing new method: `updateSettings`
+
+## 0.2.4+2
+
+* Changing `fields` property in `fetchPlace` method to required
+* Updating `plugin_platform_interface` dependency version to 2.1.3
+
 ## 0.2.4+1
 
 * fetchPlacePhoto response can also include url, to support web

@@ -55,6 +55,11 @@ abstract class FlutterGooglePlacesSdkPlatform extends PlatformInterface {
     throw UnimplementedError('isInitialized() has not been implemented.');
   }
 
+  /// Updates the settings of the places client with the given API key and locale.
+  Future<void> updateSettings(String apiKey, {Locale? locale}) {
+    throw UnimplementedError('initialize() has not been implemented.');
+  }
+
   /// Fetches autocomplete predictions based on a query.
   ///
   /// If [countries]] is not null, the results are restricted to those countries.
@@ -74,7 +79,7 @@ abstract class FlutterGooglePlacesSdkPlatform extends PlatformInterface {
   Future<FindAutocompletePredictionsResponse> findAutocompletePredictions(
     String query, {
     List<String>? countries,
-    PlaceTypeFilter placeTypeFilter = PlaceTypeFilter.ALL,
+    List<PlaceTypeFilter> placeTypesFilter = const [],
     bool? newSessionToken,
     LatLng? origin,
     LatLngBounds? locationBias,
@@ -93,7 +98,7 @@ abstract class FlutterGooglePlacesSdkPlatform extends PlatformInterface {
   /// For more info about billing: https://developers.google.com/maps/documentation/places/web-service/usage-and-billing
   Future<FetchPlaceResponse> fetchPlace(
     String placeId, {
-    List<PlaceField>? fields,
+    required List<PlaceField> fields,
     bool? newSessionToken,
   }) {
     throw UnimplementedError('fetchPlaceDetails() has not been implemented.');

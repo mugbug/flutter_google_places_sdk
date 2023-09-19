@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/services.dart';
@@ -78,7 +77,7 @@ void main() {
           northeast: LatLng(lat: 38.64, lng: 23.32));
       await places.findAutocompletePredictions(testQuery,
           countries: testCountries,
-          placeTypeFilter: PlaceTypeFilter.CITIES,
+          placeTypesFilter: [PlaceTypeFilter.CITIES],
           newSessionToken: newSessionToken,
           origin: origin,
           locationBias: locationBias,
@@ -90,11 +89,11 @@ void main() {
               arguments: <String, Object>{
                 'query': testQuery,
                 'countries': testCountries,
-                'typeFilter': 'CITIES',
+                'typesFilter': 'CITIES',
                 'newSessionToken': newSessionToken,
-                'origin': origin.toMap(),
-                'locationBias': locationBias.toMap(),
-                'locationRestriction': locationRestriction.toMap(),
+                'origin': origin.toJson(),
+                'locationBias': locationBias.toJson(),
+                'locationRestriction': locationRestriction.toJson(),
               })
         ],
       );

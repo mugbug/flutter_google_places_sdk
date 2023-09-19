@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,20 +20,29 @@ class FlutterGooglePlacesSdkMethodChannel
 
   @override
   Future<void> initialize(String apiKey, {Locale? locale}) {
-    return _channel.invokeMethod<void>('initialize', {
-      'apiKey': apiKey,
-      'locale': locale == null
-          ? null
-          : {
-              'country': locale.countryCode,
-              'language': locale.languageCode,
-            },
-    });
+    return _invokeForSettings('initialize', apiKey, locale);
   }
 
   @override
   Future<void> deinitialize() {
     return _channel.invokeMethod<void>('deinitialize');
+  }
+
+  @override
+  Future<void> updateSettings(String apiKey, {Locale? locale}) {
+    return _invokeForSettings('updateSettings', apiKey, locale);
+  }
+
+  Future<void> _invokeForSettings(String methodName, String apiKey, Locale? locale) {
+    return _channel.invokeMethod<void>(methodName, {
+      'apiKey': apiKey,
+      'locale': locale == null
+          ? null
+          : {
+        'country': locale.countryCode,
+        'language': locale.languageCode,
+      },
+    });
   }
 
   /* Client methods */
@@ -43,7 +51,7 @@ class FlutterGooglePlacesSdkMethodChannel
   Future<FindAutocompletePredictionsResponse> findAutocompletePredictions(
     String query, {
     List<String>? countries,
-    PlaceTypeFilter placeTypeFilter = PlaceTypeFilter.ALL,
+    List<PlaceTypeFilter> placeTypesFilter = const [],
     bool? newSessionToken,
     LatLng? origin,
     LatLngBounds? locationBias,
@@ -57,11 +65,11 @@ class FlutterGooglePlacesSdkMethodChannel
       {
         'query': query,
         'countries': countries ?? [],
-        'typeFilter': placeTypeFilter.value,
+        'typesFilter': placeTypesFilter.map((e) => e.value).toList(),
         'newSessionToken': newSessionToken,
-        'origin': origin?.toMap(),
-        'locationBias': locationBias?.toMap(),
-        'locationRestriction': locationRestriction?.toMap(),
+        'origin': origin?.toJson(),
+        'locationBias': locationBias?.toJson(),
+        'locationRestriction': locationRestriction?.toJson(),
       },
     ).then(_responseFromResult);
   }
@@ -71,7 +79,7 @@ class FlutterGooglePlacesSdkMethodChannel
   ) {
     final items = value
             ?.map((item) => item.cast<String, dynamic>())
-            .map((map) => AutocompletePrediction.fromMap(map))
+            .map((map) => AutocompletePrediction.fromJson(map))
             .toList(growable: false) ??
         [];
     return FindAutocompletePredictionsResponse(items);
@@ -80,14 +88,14 @@ class FlutterGooglePlacesSdkMethodChannel
   @override
   Future<FetchPlaceResponse> fetchPlace(
     String placeId, {
-    List<PlaceField>? fields,
+    required List<PlaceField> fields,
     bool? newSessionToken,
   }) {
     return _channel.invokeMapMethod(
       'fetchPlace',
       {
         'placeId': placeId,
-        'fields': fields?.map((e) => e.value).toList() ?? [],
+        'fields': fields.map((e) => e.value).toList(),
         'newSessionToken': newSessionToken,
       },
     ).then(_responseFromPlaceDetails);
@@ -95,7 +103,7 @@ class FlutterGooglePlacesSdkMethodChannel
 
   FetchPlaceResponse _responseFromPlaceDetails(dynamic value) {
     final Place? place =
-        value == null ? null : Place.fromMap(value.cast<String, dynamic>());
+        value == null ? null : Place.fromJson(value.cast<String, dynamic>());
     return FetchPlaceResponse(place);
   }
 

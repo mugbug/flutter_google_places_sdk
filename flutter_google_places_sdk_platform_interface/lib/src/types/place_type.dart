@@ -143,11 +143,24 @@ enum PlaceType {
   TRAVEL_AGENCY,
   UNIVERSITY,
   VETERINARY_CARE,
-  ZOO,
+  ZOO
+  ;
+
+  factory PlaceType.fromJson(String name) {
+    name = name.toLowerCase();
+    for (final value in values) {
+      if (value.name.toLowerCase() == name) {
+        return value;
+      }
+    }
+    throw ArgumentError.value(name, 'name', 'No enum value with that name');
+  }
 }
 
-final placeTypeValuesMap = Map.fromIterable(PlaceType.values,
-    key: (item) => describeEnum(item), value: (item) => item);
+final placeTypeValuesMap = {
+  for (final placeType in PlaceType.values)
+    describeEnum(placeType): placeType
+};
 
 extension PlaceTypeDescriptor on PlaceType {
   String get value => toString();
@@ -158,6 +171,6 @@ extension PlaceTypeEnumParser on String {
     if (toUpperCase() == 'NULL') {
       return null;
     }
-    return placeTypeValuesMap[this];
+    return placeTypeValuesMap[toUpperCase()];
   }
 }
